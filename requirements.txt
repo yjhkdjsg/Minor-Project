@@ -1,0 +1,15 @@
+opencv-python
+mediapipe
+tensorflow==2.16.1
+Pillow
+numpy<2
+pandas
+seaborn
+scikit-learn
+matplotlib
+streamlit
+pymongo
+python-dotenv
+transformers
+torch
+sentencepiece
