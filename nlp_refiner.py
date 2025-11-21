@@ -1,11 +1,28 @@
 from openai import OpenAI
 import time
 import torch
+import requests
 
 client = OpenAI(
     base_url="http://192.168.18.1:1234/v1",   # YOUR actual LM Studio server
     api_key="lm-studio"
 )
+
+def test_lm_studio_connection():
+    """Test if LM Studio server is accessible"""
+    try:
+        response = requests.get("http://192.168.18.1:1234/v1/models", timeout=5)
+        if response.status_code == 200:
+            models = response.json()
+            return True, f"Connected! Available models: {len(models.get('data', []))}"
+        else:
+            return False, f"Server responded with status {response.status_code}"
+    except requests.exceptions.ConnectRefused:
+        return False, "Connection refused - LM Studio not running or wrong address"
+    except requests.exceptions.Timeout:
+        return False, "Connection timeout - check network/firewall"
+    except Exception as e:
+        return False, f"Connection error: {str(e)}"
 
 def preprocess(chars):
     vowels = set("aeiou")
@@ -59,6 +76,11 @@ def refine_asl_buffer(buffer_input):
     # Preprocess
     preprocessed = preprocess(cleaned_buffer)
     
+    # Test connection first
+    connected, connection_msg = test_lm_studio_connection()
+    if not connected:
+        raise Exception(f"LM Studio connection failed: {connection_msg}")
+    
     try:
         response = client.chat.completions.create(
             model="qwen2.5-0.5b-instruct",   # change to your loaded model
@@ -87,8 +109,8 @@ def refine_asl_buffer(buffer_input):
         refined_text = response.choices[0].message.content.strip()
         
     except Exception as e:
-        # Fallback to simple cleaning if API fails
-        refined_text = preprocessed
+        # Better error info for debugging
+        raise Exception(f"LM Studio API error: {str(e)}")
     
     # Get device info
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -100,7 +122,8 @@ def refine_asl_buffer(buffer_input):
         'preprocessed': preprocessed,
         'cleaned': cleaned,
         'processing_time_seconds': round(processing_time, 3),
-        'model_device': device
+        'model_device': device,
+        'connection_status': connection_msg
     }
 
 
